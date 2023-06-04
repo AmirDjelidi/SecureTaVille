@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">SecureTaVille</string>
+    <string name="title_activity_maps">MapsActivity</string>
+    <string name="button" translatable="false">+</string>
+    <string name="done">done</string>
+    <string name="clear">clear</string>
+    <string name="logo">logo\n</string>
+
+
+</resources>
