@@ -1,5 +1,6 @@
 package com.example.securetaville;
 
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
@@ -14,7 +15,9 @@ public class LoginActivity extends AppCompatActivity {
     private EditText usernameEditText;
     private EditText passwordEditText;
     private Button loginButton;
+    private Button registerButton;
 
+    @SuppressLint("MissingInflatedId")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -23,6 +26,7 @@ public class LoginActivity extends AppCompatActivity {
         usernameEditText = findViewById(R.id.et_username);
         passwordEditText = findViewById(R.id.et_password);
         loginButton = findViewById(R.id.btn_login);
+        registerButton = findViewById(R.id.btn_register);
 
         loginButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -41,9 +45,15 @@ public class LoginActivity extends AppCompatActivity {
                 }
             }
         });
+        registerButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Toast.makeText(LoginActivity.this, "Les inscriptions sont désactivées. Veuillez vous connectez avec username et password", Toast.LENGTH_LONG).show();
+            }
+        });
     }
 
     private boolean isValidCredentials(String username, String password) {
-        return username.equals("pwd") && password.equals("pwd");
+        return username.equals("username") && password.equals("password");
     }
 }
