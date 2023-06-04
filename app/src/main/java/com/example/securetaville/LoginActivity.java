@@ -44,6 +44,6 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private boolean isValidCredentials(String username, String password) {
-        return username.equals("Léo") && password.equals("pwd");
+        return username.equals("pwd") && password.equals("pwd");
     }
 }

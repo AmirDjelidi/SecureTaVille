@@ -7,12 +7,15 @@ import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 
 import android.Manifest;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.MenuItem;
 import android.view.View;
@@ -20,6 +23,7 @@ import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.Toast;
 
+import com.example.securetaville.databinding.ActivityMainBinding;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -38,8 +42,13 @@ import com.google.android.gms.tasks.Task;
 import com.google.android.material.navigation.NavigationView;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -52,11 +61,16 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private Circle circle;
     private Marker invisibleMarker;
     private String circleAddress;
+    ArrayList<String> Adresse;
+    ActivityMainBinding binding;
+    SharedPreferences sharedPreferences;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        binding = ActivityMainBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
 
 
 
@@ -64,7 +78,23 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         addMarkerButton = findViewById(R.id.fab);
         doneButton = findViewById(R.id.done);
         clearButton = findViewById(R.id.clear);
+        Adresse = new ArrayList<>();
 
+        sharedPreferences = getSharedPreferences("location", 0);
+
+
+        binding.bottomNavigationView.setOnItemSelectedListener(item -> {
+            int itemId = item.getItemId();
+            if (itemId == R.id.menu_addresses) {
+                // Ouvrir AddressListActivity
+                Intent addressIntent = new Intent(MainActivity.this, AddressListActivity.class);
+                addressIntent.putStringArrayListExtra("adresses", Adresse);
+                startActivity(addressIntent);
+                return true;
+            }
+            // Gérer d'autres éléments du menu si nécessaire
+            return false;
+        });
 
         addMarkerButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -96,7 +126,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     // Créer un marker invisible sur le centre du cercle
                     invisibleMarker = googleMap.addMarker(new MarkerOptions()
                             .position(circle.getCenter())
-                            .alpha(0));
+                            .alpha(0)
+                            .snippet("Ajouté à " + getCurrentTime()));
 
                     // Récupérer l'adresse correspondante à la position du marker invisible
                     if (invisibleMarker != null) {
@@ -108,7 +139,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                                 Address address = addresses.get(0);
                                 circleAddress = address.getAddressLine(0);
                                 invisibleMarker.setTitle(circleAddress); // Ajouter l'adresse comme titre du marker invisible
-                                invisibleMarker.showInfoWindow(); // Afficher la bulle d'info du marker invisible
+                                invisibleMarker.showInfoWindow();
+                                SharedPreferences.Editor editor = sharedPreferences.edit();
+                                editor.putString("adresses : ", circleAddress.toString());
+                                editor.commit();
+
+
+                                // Afficher la bulle d'info du marker invisible
                                 // Utilisez la variable circleAddress comme vous le souhaitez
                             }
                         } catch (IOException e) {
@@ -141,6 +178,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         checkLocationPermission();
     }
 
+    private String getCurrentTime() {
+        SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm");
+        return dateFormat.format(new Date());
+    }
     private void checkLocationPermission() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
                 && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -189,6 +230,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         googleMap.setMaxZoomPreference(16);
         googleMap.setMinZoomPreference(12);
 
+
+
         googleMap.setOnCameraMoveListener(new GoogleMap.OnCameraMoveListener() {
             @Override
             public void onCameraMove() {
@@ -203,21 +246,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 if (circle.getTag() != null && circle.getTag().equals("circle")) {
                     // Clic sur le cercle invisible
                     LatLng latLng = circle.getCenter();
-                    Geocoder geocoder = new Geocoder(MainActivity.this);
-
-                    try {
-                        List<Address> addresses = geocoder.getFromLocation(latLng.latitude, latLng.longitude, 1);
-                        if (addresses != null && addresses.size() > 0) {
-                            Address address = addresses.get(0);
-                            String circleAddress = address.getAddressLine(0);
-                            // Utilisez la variable circleAddress comme vous le souhaitez
-                            Toast toast = Toast.makeText(MainActivity.this, "Adresse : " + circleAddress, Toast.LENGTH_SHORT);
-                            toast.setGravity(Gravity.CENTER, 0, 1000);
-                            toast.show();
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                    getMarkerAddress(latLng);
                 }
             }
         });
@@ -231,9 +260,78 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }
             }
         });
-        
+
+        addCircleAndMarkerIfAddressesExist();
+    }
+    private void getMarkerAddress(LatLng latLng) {
+        Geocoder geocoder = new Geocoder(MainActivity.this, Locale.getDefault());
+        try {
+            List<Address> addresses = geocoder.getFromLocation(latLng.latitude, latLng.longitude, 1);
+            if (addresses != null && addresses.size() > 0) {
+                Address address = addresses.get(0);
+                String circleAddress = address.getAddressLine(0);
+                Adresse.add(circleAddress);
+                saveAddresses(Adresse);
+                Toast toast = Toast.makeText(MainActivity.this, "Adresse : " + circleAddress, Toast.LENGTH_SHORT);
+                toast.setGravity(Gravity.CENTER, 0, 0);
+                toast.show();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
+    private void saveAddresses(List<String> addresses) {
+        SharedPreferences sharedPreferences = getSharedPreferences("MyPrefs", MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putStringSet("addresses", new HashSet<>(addresses));
+        editor.apply();
+    }
+
+    private void addCircleAndMarkerIfAddressesExist() {
+        if (!Adresse.isEmpty()) {
+            String lastAddress = Adresse.get(Adresse.size() - 1); // Récupérer la dernière adresse ajoutée
+            Geocoder geocoder = new Geocoder(this, Locale.getDefault());
+            try {
+                List<Address> addresses = geocoder.getFromLocationName(lastAddress, 1);
+                if (addresses != null && !addresses.isEmpty()) {
+                    Address address = addresses.get(0);
+                    LatLng latLng = new LatLng(address.getLatitude(), address.getLongitude());
+
+                    // Ajouter le cercle
+                    if (circle != null) {
+                        circle.remove();
+                    }
+                    CircleOptions circleOptions = new CircleOptions()
+                            .center(latLng)
+                            .radius(30)
+                            .strokeColor(Color.rgb(255, 108, 0))
+                            .fillColor(Color.argb(120, 255, 156, 0))
+                            .clickable(true);
+                    circle = googleMap.addCircle(circleOptions);
+
+                    // Ajouter le marqueur
+                    invisibleMarker = googleMap.addMarker(new MarkerOptions()
+                            .position(latLng)
+                            .alpha(0)
+                            .snippet("Ajouté à " + getCurrentTime()));
+
+                    // Afficher la bulle d'info du marqueur invisible
+                    if (invisibleMarker != null) {
+                        invisibleMarker.setTitle(lastAddress);
+                        invisibleMarker.showInfoWindow();
+                    }
+
+                    // Centrer la caméra sur le marqueur
+                    googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 14));
+
+                    Toast.makeText(this, "Adresse ajoutée : " + lastAddress, Toast.LENGTH_SHORT).show();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
